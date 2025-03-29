@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pollution Defense: Animal Anatomy Survival Game</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #222;
+      font-family: Arial, sans-serif;
+      color: #fff;
+      text-align: center;
+    }
+    #menu {
+      padding: 20px;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    canvas {
+      display: block;
+      margin: 20px auto;
+      background-color: #f0f0f0;
+      border: 2px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <h1>Pollution Defense: Animal Anatomy Survival Game</h1>
+    <p>Select Your Animal:</p>
+    <button onclick="startGame('fish')">Fish</button>
+    <button onclick="startGame('bird')">Bird</button>
+    <button onclick="startGame('rabbit')">Rabbit</button>
+  </div>
+  
+  <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
+  
+  <script>
+    // Get canvas and context
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let gameInterval; // for the game loop
+    let animal = null; // selected animal will be stored here
+    let pollutants = []; // array to hold pollutant objects
+    let keys = {}; // store key states
+    let score = 0;
+    let level = 1;
+    
+    // Base definitions for each animal
+    const animals = {
+      fish: { x: 400, y: 300, size: 30, color: 'blue', health: 100, speed: 3 },
+      bird: { x: 400, y: 300, size: 30, color: 'red', health: 100, speed: 4 },
+      rabbit: { x: 400, y: 300, size: 30, color: 'green', health: 100, speed: 3 }
+    };
+    
+    // Define pollutant types per animal (for demonstration)
+    const pollutantTypes = {
+      fish: ['plastic', 'oil', 'noise'],
+      bird: ['smog', 'toxic', 'habitat'],
+      rabbit: ['deforestation', 'pesticide', 'urban noise']
+    };
+
+    // Colors for pollutants (feel free to adjust)
+    const pollutantColors = {
+      plastic: 'purple',
+      oil: 'black',
+      noise: 'gray',
+      smog: 'brown',
+      toxic: 'orange',
+      habitat: 'darkgreen',
+      deforestation: 'sienna',
+      pesticide: 'yellow',
+      'urban noise': 'pink'
+    };
+    
+    // Called when an animal is selected
+    function startGame(selectedAnimal) {
+      document.getElementById('menu').style.display = 'none';
+      canvas.style.display = 'block';
+      // Clone the selected animal object into our game state
+      animal = { ...animals[selectedAnimal], type: selectedAnimal };
+      
+      // Start the game loop (60 FPS)
+      gameInterval = setInterval(gameLoop, 1000/60);
+      
+      // Set up key listeners
+      window.addEventListener('keydown', keyDown);
+      window.addEventListener('keyup', keyUp);
+      
+      // Spawn pollutants every 2 seconds
+      setInterval(spawnPollutant, 2000);
+    }
+    
+    // Keydown event: record key and use spacebar for ability
+    function keyDown(e) {
+      keys[e.key] = true;
+      // Pressing space activates cleansing/shield ability to restore health
+      if (e.key === ' ') {
+         animal.health = Math.min(animal.health + 20, 100);
+      }
+    }
+    
+    // Keyup event: clear key state
+    function keyUp(e) {
+      keys[e.key] = false;
+    }
+    
+    // Create a pollutant with random properties
+    function spawnPollutant() {
+      const types = pollutantTypes[animal.type];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const size = Math.random() * 20 + 20;
+      
+      // Ensure pollutant doesn't spawn too close to the animal
+      let x, y;
+      do {
+        x = Math.random() * canvas.width;
+        y = Math.random() * canvas.height;
+      } while (Math.hypot(x - animal.x, y - animal.y) < 100);
+      
+      // Random movement direction
+      const dx = (Math.random() - 0.5) * 2;
+      const dy = (Math.random() - 0.5) * 2;
+      
+      pollutants.push({ x, y, dx, dy, size, type });
+    }
+    
+    // Update positions of pollutants and bounce off canvas edges
+    function updatePollutants() {
+      pollutants.forEach(p => {
+         p.x += p.dx;
+         p.y += p.dy;
+         if (p.x < 0 || p.x > canvas.width) p.dx = -p.dx;
+         if (p.y < 0 || p.y > canvas.height) p.dy = -p.dy;
+      });
+    }
+    
+    // Check for collisions between animal and pollutants
+    function detectCollisions() {
+      for (let i = pollutants.length - 1; i >= 0; i--) {
+         const p = pollutants[i];
+         const dist = Math.hypot(animal.x - p.x, animal.y - p.y);
+         if (dist < animal.size / 2 + p.size / 2) {
+            // On collision, reduce health
+            animal.health -= 10;
+            pollutants.splice(i, 1);
+         }
+      }
+    }
+    
+    // Update the animal's position based on key inputs
+    function updateAnimal() {
+      if (keys['ArrowUp']) animal.y -= animal.speed;
+      if (keys['ArrowDown']) animal.y += animal.speed;
+      if (keys['ArrowLeft']) animal.x -= animal.speed;
+      if (keys['ArrowRight']) animal.x += animal.speed;
+      
+      // Constrain movement to canvas boundaries
+      animal.x = Math.max(animal.size / 2, Math.min(canvas.width - animal.size / 2, animal.x));
+      animal.y = Math.max(animal.size / 2, Math.min(canvas.height - animal.size / 2, animal.y));
+    }
+    
+    // Draw the animal on the canvas
+    function drawAnimal() {
+      ctx.beginPath();
+      ctx.arc(animal.x, animal.y, animal.size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = animal.color;
+      ctx.fill();
+      ctx.closePath();
+    }
+    
+    // Draw all pollutants on the canvas
+    function drawPollutants() {
+      pollutants.forEach(p => {
+         ctx.beginPath();
+         ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
+         ctx.fillStyle = pollutantColors[p.type] || 'gray';
+         ctx.fill();
+         ctx.closePath();
+      });
+    }
+    
+    // Display the UI elements (health, level, etc.)
+    function drawUI() {
+      ctx.fillStyle = 'black';
+      ctx.font = '16px Arial';
+      ctx.fillText(`Health: ${animal.health}`, 10, 20);
+      ctx.fillText(`Level: ${level}`, 10, 40);
+    }
+    
+    // The main game loop: update, detect collisions, draw, and check game over
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      updateAnimal();
+      updatePollutants();
+      detectCollisions();
+      
+      drawAnimal();
+      drawPollutants();
+      drawUI();
+      
+      // Increase score and level up periodically to add challenge
+      score++;
+      if (score % 500 === 0) {
+         level++;
+         // Increase pollutant speed slightly on level-up
+         pollutants.forEach(p => {
+            p.dx *= 1.1;
+            p.dy *= 1.1;
+         });
+      }
+      
+      // End game if health drops to zero
+      if (animal.health <= 0) {
+         clearInterval(gameInterval);
+         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+         ctx.fillStyle = 'white';
+         ctx.font = '48px Arial';
+         ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2);
+      }
+    }
+  </script>
+</body>
+</html>
