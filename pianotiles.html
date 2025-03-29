@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Piano Tiles</title>
+  <style>
+    /* Styling for the reset button */
+    #resetButton {
+      font-size: 20px;
+      padding: 15px 30px;
+      background: linear-gradient(145deg, #6e7a8f, #a4b2c2);
+      border: none;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Hover effect for reset button */
+    #resetButton:hover {
+      background: linear-gradient(145deg, #a4b2c2, #6e7a8f);
+      box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Active effect for reset button */
+    #resetButton:active {
+      background: #6e7a8f;
+      box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
+      transform: translateY(2px);
+    }
+  </style>
+</head>
+<body style="margin:0; overflow:hidden; font-family:sans-serif; text-align:center;">
+  <h2 id="score" style="margin:10px;">Score: 0</h2>
+  <h3 id="level" style="margin:10px;">Level: 1</h3>
+  <button id="playButton" style="display:none; font-size:20px; padding:10px 20px; cursor:pointer;">Play</button>
+  <button id="resetButton">Reset</button>
+  <canvas id="gameCanvas" width="400" height="500" style="background:#fff; border:2px solid #000; display:block; margin:0 auto;"></canvas>
+  <div id="keys" style="display:flex; justify-content:space-around; width:400px; margin:10px auto; font-size:24px;">
+    <span>A</span><span>S</span><span>D</span><span>F</span>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const laneCount = 4;
+    const laneWidth = canvas.width / laneCount;
+    const tileHeight = 100;
+    const speed = 3;
+    const hitZoneY = canvas.height - 120;
+    const hitZoneHeight = 20;
+
+    let score = 0;
+    let tiles = [];
+    let gameOver = false;
+    let gameStarted = false;
+    let level = 1;
+    let levelStartTime = 0;
+    let countdown = 30;
+    let gamePaused = false;
+
+    function spawnTile() {
+      const lane = Math.floor(Math.random() * laneCount);
+      tiles.push({ y: -tileHeight, lane: lane });
+    }
+
+    function drawTiles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw hit zone
+      ctx.fillStyle = '#ddd';
+      ctx.fillRect(0, hitZoneY, canvas.width, hitZoneHeight);
+
+      tiles.forEach(tile => {
+        const x = tile.lane * laneWidth;
+        ctx.fillStyle = 'black';
+        ctx.fillRect(x, tile.y, laneWidth, tileHeight);
+      });
+    }
+
+    function drawTimer(elapsed) {
+      // Display 30-second timer in the top-right corner
+      const timeRemaining = Math.max(0, 30 - Math.floor(elapsed / 1000));
+      ctx.fillStyle = 'black';
+      ctx.font = '20px sans-serif';
+      ctx.fillText(`Time: ${timeRemaining}`, canvas.width - 100, 30);
+    }
+
+    function updateTiles() {
+      for (let i = tiles.length - 1; i >= 0; i--) {
+        tiles[i].y += speed;
+        if (tiles[i].y > canvas.height) {
+          gameOver = true;
+        }
+      }
+    }
+
+    function gameLoop() {
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white';
+        ctx.font = '36px sans-serif';
+        ctx.fillText('Game Over', 110, 300);
+        return;
+      }
+
+      const elapsed = Date.now() - levelStartTime;
+      if (elapsed >= 30000) { // 30 seconds for the level
+        gamePaused = true;
+        showPlayButton();
+        return;
+      }
+
+      updateTiles();
+      drawTiles();
+      drawTimer(elapsed); // Draw the 30-second timer
+      requestAnimationFrame(gameLoop);
+    }
+
+    function showPlayButton() {
+      document.getElementById('playButton').style.display = 'block';
+      startCountdown();
+    }
+
+    function startCountdown() {
+      const countdownInterval = setInterval(() => {
+        if (countdown > 0) {
+          document.getElementById('playButton').innerText = `Play (${countdown})`;
+          countdown--;
+        } else {
+          clearInterval(countdownInterval);
+          document.getElementById('playButton').innerText = 'Play';
+        }
+      }, 1000);
+    }
+
+    function hitTile(lane) {
+      for (let i = 0; i < tiles.length; i++) {
+        const t = tiles[i];
+        if (
+          t.lane === lane &&
+          t.y + tileHeight >= hitZoneY &&
+          t.y <= hitZoneY + hitZoneHeight
+        ) {
+          tiles.splice(i, 1);
+          score++;
+          document.getElementById('score').innerText = 'Score: ' + score;
+          return;
+        }
+      }
+
+      // If no tile was hit, that's a miss — end the game
+      gameOver = true;
+    }
+
+    // Key bindings: A=0, S=1, D=2, F=3
+    window.addEventListener('keydown', e => {
+      if (gameOver || gamePaused) return;
+      const keyMap = { 'a': 0, 's': 1, 'd': 2, 'f': 3 };
+      const lane = keyMap[e.key.toLowerCase()];
+      if (lane !== undefined) {
+        hitTile(lane);
+      }
+    });
+
+    // Play button functionality
+    document.getElementById('playButton').addEventListener('click', () => {
+      countdown = 30;
+      document.getElementById('playButton').style.display = 'none';
+      startLevel();
+    });
+
+    // Reset button functionality
+    document.getElementById('resetButton').addEventListener('click', () => {
+      resetGame();
+    });
+
+    // Start game and levels
+    function startLevel() {
+      gameOver = false;
+      tiles = [];
+      score = 0;
+      document.getElementById('score').innerText = 'Score: ' + score;
+      document.getElementById('level').innerText = 'Level: ' + level;
+      levelStartTime = Date.now();
+      gamePaused = false;
+      gameLoop();
+      setInterval(spawnTile, 1000); // spawn every 1 second
+      level++;
+    }
+
+    // Reset the game
+    function resetGame() {
+      score = 0;
+      level = 1;
+      document.getElementById('score').innerText = 'Score: ' + score;
+      document.getElementById('level').innerText = 'Level: ' + level;
+      gameOver = false;
+      tiles = [];
+      gamePaused = false;
+      document.getElementById('playButton').style.display = 'none';
+      countdown = 30;
+      startLevel();
+    }
+
+    // Start the first level
+    startLevel();
+  </script>
+</body>
+</html>
